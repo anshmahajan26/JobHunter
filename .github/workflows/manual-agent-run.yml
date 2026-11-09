@@ -1,0 +1,55 @@
+name: Manual Agent Execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'Specific User ID to run for (leave blank for all active users)'
+        required: false
+        default: ''
+
+concurrency:
+  group: jobpilot-manual-agent-${{ github.actor }}
+  cancel-in-progress: false
+
+jobs:
+  run-agent:
+    name: Execute Manual Job Hunt
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install Server Dependencies
+        run: npm ci --prefix server
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: server
+
+      - name: Execute Agent Run
+        env:
+          NODE_ENV: production
+          TARGET_USER_ID: ${{ inputs.user_id }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          HEADLESS_BROWSER: 'true'
+        run: node src/agents/jobHuntAgent.js
+        working-directory: server
+
